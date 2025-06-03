@@ -1,0 +1,14 @@
+name: mx_hardware #Environment for hardware control/behavior rigs/arduino
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python>=3.10
+  - pytest
+  - pyserial
+  - numpy>=1.21
+  - pandas
+  - spyder-kernels=3.0
+  - textual
+  - textual-dev
+  - keyboard

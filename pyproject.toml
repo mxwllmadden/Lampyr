@@ -1,0 +1,23 @@
+[project]
+name = "Lampyr"
+version = "0.0.1"
+description = "NA"
+authors = [
+    { name = "Maxwell Madden", email = "mxwllmadden@gmail.com" }
+]
+dependencies = [
+    "pyserial"
+]
+readme = ""
+requires-python = ">=3.7"
+
+[project.urls]
+Homepage = "https://github.com/mxwllmadden"
+
+[project.scripts]
+lampyr = "lampyr.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["lampyr", "lampyr.*"]
+
