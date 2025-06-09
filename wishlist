@@ -21,7 +21,20 @@ Lampyr.run(X with mouse)
 Lampyr.mouse to make mice
 
 
-
+6/6/2025
+WE CAN NOW RUN HABITUATION
+todo:
+    determine order of operations for lampyr object
+        config
+        mouse
+        rig / mouse / session data
+        behavior
+    enable mouse command, should be mouse [mouseid] [command] -flags
+        lampyr mouse run [mouseid]
+        lampyr mouse create [mouseid] -params
+        lampyr mouse run [mouseid] -behavior
+    create the paradigm object
+    rewrite bandit in new format
 
 TODO
 ADDITIONAL MOUSE Data Object

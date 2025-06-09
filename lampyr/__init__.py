@@ -6,3 +6,5 @@ Created on Wed May 14 14:59:12 2025
 """
 
 from lampyr.main import Lampyr
+
+__version__ = '0.0.1'

@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from collections import defaultdict
 import time
 
+
 class ArduinoBanditRig_0:
     class _Measure():
         def __init__(self, parent):
@@ -73,8 +74,11 @@ class ArduinoBanditRig_0:
             self.serial._writeserial('w')
             self.serial._writeserial(f'{size}\n')
 
-    def __init__(self, customserialmonitor=False):
-        self.serial = customserialmonitor or SerialMonitor(115200)
+    def __init__(self, customserialmonitor=None):
+        if customserialmonitor is None:
+            self.serial = SerialMonitor(115200)
+        else:
+            self.serial =  customserialmonitor
         self.data = self.serial.data
         self.wheel = self.Wheel(self)
         self.licks = self.Lick(self)
@@ -148,6 +152,7 @@ class SerialMonitor:
         ports = [p for p in ports if 'Arduino' in p.description]
         port = ports[0]
         self.ser = serial.Serial(port.device, self.baud, timeout=self.timeout)
+        time.sleep(2)
         self.ser.reset_input_buffer()
         self.ser.flush()
 
@@ -211,8 +216,6 @@ class SerialMonitor:
 
 
 if __name__ == '__main__':
-    
-    
     try:
         rig = ArduinoBanditRig_0(SerialMonitor(115200))
         rig.listen()

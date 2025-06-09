@@ -30,6 +30,7 @@ void setup() {
   // put your setup code here, to run once:
   
   Serial.begin(115200);
+  while (!Serial);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(SPEAKERPIN, OUTPUT);
   pinMode(REWARDPIN, OUTPUT);

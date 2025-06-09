@@ -7,29 +7,28 @@ Created on Mon May 26 16:49:26 2025
 import time
 from dataclasses import dataclass
 import random
-from lampyr.primatives import Behavior
+from lampyr.primatives import Task, Trial
 
 @dataclass
-class HabituationTrial(Behavior):
+class HabituationTrial(Trial):
     prerewardduration: int = 5
     maxpostrewardduration: int = 5
     minpostrewardduration: int = 2
-
     def loop(self):
-        self.printlog('TS0s', 'Trial Start')
+        self.logevent('TS0s', 'Trial Start')
         time.sleep(self.prerewardduration)
-        rewardtime = self.printlog('REWARD', 'Reward given')
+        rewardtime = self.logevent('REWARD', 'Reward given')
         self.rig.play.rewardtone()
         self.rig.reward.give()
         licked = self.loop_lickmonitor()
         if not licked:
-            self.log_abstention()
-            self.printlog('No lick detected')
+            self.logabstention()
+            self.logevent('No lick detected')
         else:
-            self.log_merit()
-            print('Reward was licked')
-        self.printlog('TS0e', 'Trial End')
-        self.stoplog('finished')
+            self.logmerit()
+            self.logevent('Reward was licked')
+        self.logevent('TS0e', 'Trial End')
+        self.stop('finished')
     
     def loop_lickmonitor(self):
         slick = time.time()
@@ -37,7 +36,7 @@ class HabituationTrial(Behavior):
         licked = False
         while time.time() - slick < self.maxpostrewardduration:
             if self.rig.licks.since(lastlicktest):
-                print('lick!')
+                self.logevent('lick!')
                 licked = True
             lastlicktest = time.time()
             if licked == True and time.time() - slick > self.minpostrewardduration:
@@ -47,25 +46,10 @@ class HabituationTrial(Behavior):
 
 
 @dataclass
-class RewardedHabituationTask(Behavior):
-    serial_abstention_limit : int = 25
-    reward_limit : int = 200
-    
+class RewardedHabituationTask(Task):
     def loop(self):
-        while True:
-            if self.stop_reason:
-                break
-            trial = HabituationTrial(name=f'{self.name}_Trial{len(self.subdata)}',
-                                     rig=self.rig,
-                                     mouse=self.mouse,
-                                     save=self.save,
-                                     properties=self.properties,
-                                     prerewardduration=random.randint(1, 5),
-                                     maxpostrewardduration=45)
-            trial.run()
-            trialdata = trial.dump()
-            self.log_subdata(trialdata)
-            del trial
-
-    def evaluate_trial(self, trial):
-        pass
+        trial = HabituationTrial(parent = self,
+                                 prerewardduration=random.randint(5, 15),
+                                 maxpostrewardduration=45)
+        trial.run()
+        del trial

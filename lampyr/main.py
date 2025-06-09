@@ -5,74 +5,22 @@ Created on Thu May 22 15:48:30 2025
 @author: mxwll
 """
 
-from lampyr import config
 from copy import deepcopy
 import os
 import json
 from dataclasses import dataclass
-from lampyr.primatives import Mouse
+from lampyr.primatives import Mouse, Behavior, BehaviorSession
+from lampyr.config import ConfigManager
+import numpy as np
+from lampyr.rigcontrol import ArduinoBanditRig_0, SerialMonitor
+import time
 
 
-class Manager:
+class MouseManager():
     def __init__(self, config):
+        self.mouse = None
         self.config = config
-
-
-class ConfigManager:
-    DEFAULT_CONFIG = {'lampyr': {'configured': False,
-                                 'mice_directory': 'N:/Maxwell/Labwork/Data_All'},
-                      'rig': {'calibrated': 0,
-                              'sipper_calib': 40000}
-                      }
-    WDIR = os.path.join(os.getenv('LOCALAPPDATA'), 'lampyr')
-    CONFIG_FILE = os.path.join(WDIR, 'config.json')
-
-    def __init__(self):
-        self.wdir = self.WDIR
-        self.config_file = self.CONFIG_FILE
-        self.load()
-    
-    @property
-    def config(self):
-        if self._config is None:
-            self._config = self.load()
-        return deepcopy(self._config)
-    
-    @property
-    def configured(self):
-        return self._config['lampyr']['configured']
-    
-    @configured.setter
-    def configured(self, value : bool):
-        if not isinstance(value, bool):
-            raise KeyError('Value must be bool')
-        self._config['lampyr']['configured'] = value
-
-    @property
-    def micedir(self):
-        return self._config['lampyr']['mice_directory']
-
-    @micedir.setter
-    def micedir(self, value):
-        if not isinstance(value, str):
-            raise KeyError('Value must be string')
-        self._config['lampyr']['mice_directory'] = value
-
-    def load(self):
-        os.makedirs(self.wdir, exist_ok=True)
-        if os.path.exists(self.config_file):
-            with open(self.config_file, 'r') as f:
-                config = json.load(f)
-            self._config = config
-            return
-        self._config = deepcopy(self.DEFAULT_CONFIG)
-
-    def save(self):
-        with open(self.config_file, 'w') as f:
-            json.dump(self._config, f, indent=2)
-
-
-class MouseManager(Manager):
+        
     def list(self):
         folders = os.listdir(self.config.micedir)
         mice = {}
@@ -95,36 +43,144 @@ class MouseManager(Manager):
 
     def load(self, mouseid):
         if not self.exists(mouseid):
-            return None
+            self.mouse = None
         with open(self.path(mouseid), 'r') as f:
             mousedat = json.load(f)
         self.mouse = Mouse(**mousedat)
 
     def exists(self, mouseid):
         return os.path.exists(self.path(mouseid))
+    
+    def save(self):
+        pass
 
+class RigManager():
+    def __init__(self, config):
+        self.config = config
+        self.rig = None
+        self.connected = False
+        
+    def connect(self):
+        print('Connecting to Arduino Rig...')
+        rig = ArduinoBanditRig_0()
+        print('Creating serial monitor thread...')
+        rig.listen()
+        print('Setting stored rig sipper calibration...')
+        rig.reward.setsize(self.config.rig_sippercalibration)
+        self.rig = rig
+        self.connected = True
+    
+    def disconnect(self):
+        print('Closing monitoring thread...')
+        self.rig.abort()
+        time.sleep(2)
+        print('Disconnecting from Arduino Rig...')
+        self.rig.close()
+        self.connected = False
+        
+    def calibrate(self):
+        if not self.connected:
+            self.connect()
+        def linreg(x,y):
+            x = np.asarray(x)
+            y = np.asarray(y)
+            a, b = np.polyfit(x, y, 1)
+            y_pred = a * x + b
+            r2 = 1 - np.sum((y - y_pred)**2) / np.sum((y - np.mean(y))**2)
 
-class RunManager(Manager):
-    pass
-
-
-class DataManager(Manager):
-    pass
+            return a, b, r2
+        
+        def inputfloat(prompt):
+            while True:
+                val = input(prompt)
+                try:
+                    number = float(val)
+                    break
+                except ValueError:
+                    print("Please enter a valid number.")
+            return number
+        
+        def calib_disp(disp_size):
+            disp_size=int(disp_size)
+            self.rig.reward.setsize(disp_size)
+            initial_value = inputfloat('INPUT CURRENT WATER LEVEL (ml): ')
+            time.sleep(0.1)
+            for i in range(20):
+                self.rig.reward.give()
+                time.sleep(0.4)
+            dvol = (initial_value - inputfloat('NEW WATER LEVEL (ml):'))/20
+            print(f'Reward Size: {disp_size} produces {str(dvol)[:10]} ml reward')
+            return dvol
+        
+        while True:
+            print('\nBEGINING CALIBRATION')
+            dsizes = [20000,30000,50000]
+            dvols = []
+            for disp_size in dsizes:
+                dvol = calib_disp(disp_size)
+                dvols.append(dvol)
+            slope, coeff, r2 = linreg(dsizes, dvols)
+            if r2 < 0.9:
+                print('Failed to produce linear regression. Repeating Calibration.')
+                continue
+            est_sipp = int((0.005 - coeff) / slope)
+            print(f'Estimated correct reward size is {est_sipp}')
+            print('Beginning dispenser test...')
+            dvol = calib_disp(est_sipp)
+            if abs(0.005 - dvol) < 0.0005:
+                break
+            else:
+                print('Calibration failed. Repeating calibration.')
+        print('Calibration success')
+        print(f'Rig reward size is set to {est_sipp}')
+        self.config.rig_sippercalibration = est_sipp
 
 
 class Lampyr:
     def __init__(self):
-        # Should take behavior and mouse and run everything then do file cleanup
+        self.subdata = []
+        self.name = 'Lampyr'
+        
         self.config = ConfigManager()
-        self.mouse = MouseManager(self.config)
-        self.run = RunManager(self.config)
-
-    def clean(self):
-        pass
+        self.rigmanager = RigManager(self.config)
+        self.mousemanager = MouseManager(self.config)
+        self.behaviors = {c.__name__ : c for c in Behavior.get_children()}
+        print('instantiated')
+    
+    @property
+    def rig(self):
+        return self.rigmanager.rig
+    
+    @property
+    def mouse(self):
+        return self.mousemanager.mouse
+    
+    def _number_of_parents(self, order = 0):
+        return order + 1
+    
+    def run(self, behavior = None, **kwargs):
+        if self.config.rig_lastcalibrated < 43200:
+            print('Rig has not been calibrated in > 12 hours')
+            return
+        if not self.rigmanager.connected:
+            self.rigmanager.connect()
+        if self.mouse is not None:
+            pass
+        if behavior not in self.behaviors:
+            raise KeyError('Not a valid behavior')
+        behav = self.behaviors[behavior](parent = self,
+                                         sessiondata = BehaviorSession(**kwargs)
+                                         )
+        behav.run()
+        
+    def close(self):
+        self.rigmanager.disconnect()
+        self.config.save()
+        self.mouse.save()
 
 
 if __name__ == '__main__':
-    lamp = Lampyr()
-    lamp.config.micedir = r'C:\Users\mxwll\Huda NAS Maxwell Folder\Labwork\Data_All'
-    lamp.config.save()
-    print(lamp.mouse.list()[0])
+    try:
+        lamp = Lampyr()
+    finally:
+        lamp.close()
