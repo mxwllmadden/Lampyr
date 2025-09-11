@@ -1,78 +1,91 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Jun  6 11:56:41 2025
+Created on Mon Aug 25 19:47:06 2025
 
 @author: mm4114
 """
-import os, json
-from copy import deepcopy
-import time
+from lampyr.version import __version__
 
-class ConfigManager:
-    DEFAULT_CONFIG = {'lampyr': {'configured': False,
-                                 'mice_directory': 'N:/Maxwell/Labwork/Data_All'},
-                      'rig': {'calibrated': 0,
-                              'sipper_calib': 40000}
-                      }
-    WDIR = os.path.join(os.getenv('LOCALAPPDATA'), 'lampyr')
-    CONFIG_FILE = os.path.join(WDIR, 'config.json')
+import os, json, time
+from copy import deepcopy
+
+class ConfigFile:
+    def __init__(self, default_config : dict, fp : str):
+        loaded_config = {}
+        if os.path.exists(fp):
+            try:
+                with open(fp, 'r') as f:
+                    loaded_config = json.load(f)
+            except Exception:
+                pass
+        self._config = self._merge_configs(deepcopy(default_config), loaded_config)
+        self._default = deepcopy(default_config)
+        self._syncfp = fp
+
+    def _merge_configs(self, default, loaded):
+        for key, value in default.items():
+            if key in loaded and isinstance(value, dict) and isinstance(loaded[key], dict):
+                loaded[key] = self._merge_configs(value, loaded[key])
+            elif key not in loaded:
+                loaded[key] = value
+        return loaded
+
+    def get(self, key_path):
+        keys = key_path.split('.')
+        current = self._config
+        for key in keys:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                raise KeyError(f"Key not found: {key_path}")
+        return deepcopy(current)
+
+    def set(self, key_path, value):
+        keys = key_path.split('.')
+        current = self._config
+        for key in keys[:-1]:
+            if isinstance(current, dict) and key in current:
+                current = current[key]
+            else:
+                raise KeyError(f"Key path not found: {key_path}")
+        current[keys[-1]] = value
+        self.save()
+    
+    def save(self):
+        with open(self._syncfp, 'w') as file:
+            json.dump(self.to_dict(), file, indent = 2)
+    
+    def to_dict(self):
+        return deepcopy(self._config)
+
+
+class Config(ConfigFile):
+    _APP_DATA_DIR = os.path.join(os.getenv('LOCALAPPDATA'), 'lampyr')
+    _CONFIG_FILE_PATH = os.path.join(_APP_DATA_DIR, 'config.json')
+
+    DEFAULT_CONFIG = {
+        'lampyr': {
+            'configured': False,
+            'mice_directory': 'N:/Maxwell/Labwork/Data_All',
+            'enable_saveload_failsafe': True,
+            'enable_local_mouse_backups' : True
+        },
+        'rig': {
+            'name': None,
+            'calibrated': 0,
+            'configured': False,
+            'sipper_calib': 4000
+        },
+        'notifications': {
+            'last_user' : 'mixwell'
+        }
+    }
 
     def __init__(self):
-        self._config = None
-        self.wdir = self.WDIR
-        self.config_file = self.CONFIG_FILE
-        self.load()
+        os.makedirs(self._APP_DATA_DIR, exist_ok=True)
+        super().__init__(self.DEFAULT_CONFIG, self._CONFIG_FILE_PATH)
+        self.set('lampyr.version', __version__)
     
-    @property
-    def config(self):
-        if self._config is None:
-            self._config = self.load()
-        return deepcopy(self.DEFAULT_CONFIG)
-    
-    @property
-    def rig_lastcalibrated(self):
-        return self._config['rig']['calibrated']
-    
-    @property
-    def rig_sippercalibration(self):
-        return self._config['rig']['sipper_calib']
-    
-    @rig_sippercalibration.setter
-    def rig_sippercalibration(self, value : int):
-        if not isinstance(value, int):
-            raise KeyError('Value must be int')
-        self._config['rig']['sipper_calib'] = value
-        self._config['rig']['calibrated'] = time.time()
-    
-    @property
-    def configured(self):
-        return self._config['lampyr']['configured']
-    
-    @configured.setter
-    def configured(self, value : bool):
-        if not isinstance(value, bool):
-            raise KeyError('Value must be bool')
-        self._config['lampyr']['configured'] = value
-
-    @property
-    def micedir(self):
-        return self._config['lampyr']['mice_directory']
-
-    @micedir.setter
-    def micedir(self, value):
-        if not isinstance(value, str):
-            raise KeyError('Value must be string')
-        self._config['lampyr']['mice_directory'] = value
-
-    def load(self):
-        os.makedirs(self.wdir, exist_ok=True)
-        if os.path.exists(self.config_file):
-            with open(self.config_file, 'r') as f:
-                config = json.load(f)
-            self._config = config
-            return
-        self._config = deepcopy(self.DEFAULT_CONFIG)
-
-    def save(self):
-        with open(self.config_file, 'w') as f:
-            json.dump(self._config, f, indent=2)
+    def load_extended_config(self, key, default = {}):
+        fp = os.path.join(self._APP_DATA_DIR, f'{key}.json')
+        return ConfigFile(default, fp)

@@ -1,0 +1,23 @@
+Screen {
+    padding: 1 2;  /* top/bottom 1, left/right 2 */
+}
+#top {
+    height: 3fr
+    
+}
+#mid {
+    height: 1fr
+}
+#bot {
+    height: 6fr
+}
+.bordered {
+    border: tall $secondary;
+    border-subtitle-align: right; 
+}
+.centeralign {
+    align: center middle;
+}
+VerticalScroll {
+    overflow: hidden auto;
+}

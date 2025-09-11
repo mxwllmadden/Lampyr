@@ -15,7 +15,7 @@ requires-python = ">=3.7"
 Homepage = "https://github.com/mxwllmadden"
 
 [project.scripts]
-lampyr = "lampyr.app:cli"
+lampyr = "lampyr.interfaces.click_cli.app:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

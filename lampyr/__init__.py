@@ -6,5 +6,6 @@ Created on Wed May 14 14:59:12 2025
 """
 
 from lampyr.main import Lampyr
+from lampyr.config import Config
 
-__version__ = '0.0.1'
+from .version import __version__

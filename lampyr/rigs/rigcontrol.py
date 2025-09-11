@@ -13,6 +13,7 @@ from collections import defaultdict
 import time
 
 
+
 class ArduinoBanditRig_0:
     class _Measure():
         def __init__(self, parent):
@@ -96,17 +97,16 @@ class ArduinoBanditRig_0:
     def close(self):
         self.serial.close()
 
+# Helper function to create the default dictionary for reports.
+def _create_report_dict():
+    """Returns the default dictionary structure for a new report type."""
+    return {'unix_time': [], 'arduino_time': [], 'report_value': []}
 
 @dataclass
 class SerialData:
     lock: threading.Lock = field(default_factory=lambda: threading.Lock())
     log: list = field(default_factory=lambda: [])
-    reports: dict = field(default_factory=lambda: defaultdict(
-        lambda: {'unix_time': [],
-                 'arduino_time': [],
-                 'report_value': []}
-    )
-    )
+    reports: dict = field(default_factory=lambda: defaultdict(_create_report_dict))
 
     def get_reportvals_since(self, reporttype, unixtime):
         reports = self.reports[reporttype]
@@ -164,10 +164,7 @@ class SerialMonitor:
     def purge(self):
         with self.data.lock:
             self.data.log = []
-            self.data.reports = defaultdict(lambda: {'unix_time': [],
-                                                     'arduino_time': [],
-                                                     'report_value': []}
-                                            )
+            self.data.reports = defaultdict(_create_report_dict)
 
     def _listen(self):
         time.sleep(1)
@@ -213,29 +210,3 @@ class SerialMonitor:
 
     def _writeserial(self, cmd):
         self.ser.write(cmd.encode())
-
-
-if __name__ == '__main__':
-    try:
-        rig = ArduinoBanditRig_0(SerialMonitor(115200))
-        rig.listen()
-        rig.play.begintrialtone()
-        rig.reward.setsize(100)
-        time.sleep(0.01)
-        rig.reward.setsize(200)
-        time.sleep(0.01)
-        rig.reward.setsize(42424)
-        for i in range(100):
-            rig.reward.give()
-            rig.play.rewardtone()
-            time.sleep(0.8)
-        t = time.time()
-        time.sleep(2)
-        rig.abort()
-        print('R', rig.data.get_reportvals_since('R', t))
-        print('T', rig.data.get_reportvals_since('T', -1))
-        print('W', rig.data.get_reportvals_since('W', -1))
-        print('G', rig.data.get_reportvals_since('G', -1))
-    finally:
-        rig.abort()
-        rig.serial.close()

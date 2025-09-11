@@ -12,3 +12,5 @@ dependencies:
   - textual
   - textual-dev
   - keyboard
+  - h5py
+  - requests
