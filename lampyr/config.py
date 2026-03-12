@@ -66,7 +66,7 @@ class Config(ConfigFile):
     DEFAULT_CONFIG = {
         'lampyr': {
             'configured': False,
-            'mice_directory': 'N:/Maxwell/Labwork/Data_All',
+            'mice_directory': 'N:/SHARED/Maxwell_Lampyr_MouseData',
             'enable_saveload_failsafe': True,
             'enable_local_mouse_backups' : True
         },
