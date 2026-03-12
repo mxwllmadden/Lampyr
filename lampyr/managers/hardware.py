@@ -71,7 +71,7 @@ class RigManager(AbstractManager):
 
         while True:
             self._output_func('\nBEGINING CALIBRATION')
-            dsizes = [20000, 30000, 50000]
+            dsizes = [5000, 10000, 20000]
             dvols = []
             for disp_size in dsizes:
                 dvol = calib_disp(disp_size)

@@ -5,8 +5,8 @@
 #define LICKREPORTFREQ 10 // 100Hz
 
 //pin definitions
-#define SPEAKERPIN 11
-#define REWARDPIN 9
+#define SPEAKERPIN 5
+#define REWARDPIN 12
 #define LICKOMETERPIN A0
 
 Encoder rotary(2,3);
