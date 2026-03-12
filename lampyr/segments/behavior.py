@@ -182,3 +182,7 @@ class Trial(BehaviorSegment):
                 break
             self.loop()
         self.log_trial()
+        
+    def _configure(self):
+        super()._configure()
+        self._dump_reducetorepresentations = 'event_definitions'

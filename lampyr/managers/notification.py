@@ -6,8 +6,8 @@ Created on Mon Aug 25 18:44:53 2025
 """
 
 from lampyr.managers.abstract import AbstractManager
-from lampyr.primatives import NestedConfig
-from lampyr.managers.data import loadjson, savejson
+from lampyr.files import loadjson, savejson
+import requests
 
 class NotificationManager(AbstractManager):
     def start(self):
@@ -17,3 +17,24 @@ class NotificationManager(AbstractManager):
     def add_user(self, name, service, apiid):
         pass
         
+    def send_notification(self, message, title="Notification"):
+        user_key = "uomqucympea28qtqrxg46dz3jb43tp"
+        app_token = "afmh5shjmd4pfs88jpm4nga22n62x7"
+
+        payload = {
+            "token": app_token,
+            "user": user_key,
+            "title": title,
+            "message": message
+        }
+
+        response = requests.post("https://api.pushover.net/1/messages.json", data=payload)
+
+        if response.status_code != 200:
+            raise RuntimeError(f"Pushover notification failed: {response.text}")
+
+        print("Notification sent successfully.")
+        
+
+if __name__ == '__main__':
+    NotificationManager().send_notification('test','Lampyr')

@@ -30,7 +30,10 @@ def list(lampyr : Lampyr):
     actions.printtitle('LOADED BEHAVIORS')
     actions.printheader('PARADIGMS')
     for behav in Paradigm.get_children():
-        click.echo(behav)
+        click.echo(behav.__name__)
+    actions.printheader('STAGES')
+    for behav in Stage.get_children():
+        click.echo(behav.__name__)
     actions.printheader('TASKS')
     for behav in Task.get_children():
         click.echo(behav.__name__)
@@ -65,7 +68,7 @@ def developer(lampyr):
 def info(lampyr):
     actions.printtitle(f'LAMPYR BEHAVIOR SOFTWARE v{__version__}')
     actions.printheader('CONFIG')
-    info = lampyr.config.config
+    info = lampyr.config._config
     actions.printinfo(info)
 
 @cli.group()

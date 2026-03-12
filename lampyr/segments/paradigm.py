@@ -28,7 +28,10 @@ class ParadigmSegment(Segment):
 class Stage(ParadigmSegment):
     def execute(self):
         self.define_sessionparams()
-        self.define_task()
+        try:
+            self.define_task()
+        except KeyboardInterrupt as e:
+            self.log_error('Detected user initiated force quit.')
         self.define_shaping()
     
     @abstractmethod

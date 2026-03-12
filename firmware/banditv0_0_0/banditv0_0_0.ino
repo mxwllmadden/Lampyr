@@ -74,7 +74,7 @@ void reportReward() {
   Serial.print("\t");
   Serial.println(rewardsize, DEC);
 }
-
+\
 void reportTime() {
   Serial.print(millis());
   Serial.print("\t");

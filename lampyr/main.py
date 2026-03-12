@@ -15,6 +15,7 @@ from lampyr.primatives import Session
 
 from lampyr.segments.abstract import Segment
 from lampyr.managers import DataHandler, MouseManager, RigManager
+from lampyr.managers.notification import NotificationManager
 
 
 class Lampyr:
@@ -23,15 +24,14 @@ class Lampyr:
         self._input_func = _input_func
         self.config = Config()
         self.session = None
-
+        self.datamanager = DataHandler(self)
+        
         self.rigmanager = RigManager(self)
         self.mousemanager = MouseManager(self)
-        self.datamanager = DataHandler(self)
+        self.notificationmanager = NotificationManager
 
         self.behaviors = {c.__name__: c for c in Segment.get_children()}
         self.paradigms = {}
-
-        
 
     @property
     def rig(self):
@@ -47,6 +47,9 @@ class Lampyr:
         if segment_name in self.paradigms and self.mouse is None:
             raise RuntimeError(
                 'Paradigms cannot be run without an active mouse')
+        if self.rig is None:
+            raise RuntimeError(
+                'Segments cannot be run without an active rig')
             
         self._createsession(**kwargs)
         behav = self.behaviors[segment_name](lampyr=self,
@@ -65,6 +68,11 @@ class Lampyr:
             stopcodes += behav.session.evaluatestopconditions()
             rname = self.config.get('rig.name')
             mid = self.mouse.mouseid
+            self.notificationmanager.send_notification(
+                f'Lampyr - {rname}',
+                f'{mid} has ended behavior due to {"and".join(stopcodes)}'
+                )
+            
     
     def _createsession(self, **kwargs):
         if self.mouse is not None:
@@ -74,13 +82,10 @@ class Lampyr:
     def close(self):
         if self.rig is not None:
             self.rigmanager.disconnect()
-        if self.mouse is not None:
-            if self.session is not None:
-                self.mouse.history.append({'id' : self.session.uniquesessionid})
-            self.mousemanager.save()
         if self.session is not None:
-            fp = os.path.join(self.config.get('lampyr.mice_directory'), self.session.mouseid)
-            self.datamanager.lampyr_savesession(self.session)
+            self.datamanager.savesession()
+        if self.mouse is not None:
+            self.mousemanager.save() # Important that mouse is saved after session
 
 
 if __name__ == '__main__':

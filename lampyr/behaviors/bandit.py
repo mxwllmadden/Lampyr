@@ -100,6 +100,7 @@ class BanditTrial(Trial):
         self.register_event('response',
                             description='Wheel response registered')
         self._trialstage = 'iti1'
+        self.log_debug(self.trial_rewardprobs_perc)
 
     def loop(self):
         time.sleep(0.1)
@@ -183,7 +184,7 @@ class BanditTask(Task):
     reward_prob_target: int = 80
     reward_prob_offtarget: int = 20
 
-    rescue_trial_enabled: bool = True
+    rescue_trial_enabled: bool = False
     rescue_limit: int = 3
     rescue_cooldown: int = 2
     rescue_threshold: int = 12
@@ -193,18 +194,13 @@ class BanditTask(Task):
     taskblocks_blockcounttype: Literal['Reward', 'Merit', 'RewardedMerit'] = 'Reward'
     taskblocks_consecutivecounttype: Literal['Reward', 'Merit', 'RewardedMerit'] = 'Merit'
     taskblocks_minimumconsecutivecount: int = -1
+    
+    random_target_probs_enabled:bool = False
+    random_target_probs_targets: List[int] = field(default_factory = lambda : [80,90,100])
+    random_target_probs_offtargets: List[int] = field(default_factory = lambda: [0,10,20])
+    random_target_probs_probability_of_nulltrialblock: int = 15
 
     def setup(self):
-        self._targetrewardprobabilityselection = {'Left': {'Left': self.reward_prob_target,
-                                                           'Right': self.reward_prob_offtarget,
-                                                           'None': 0},
-                                                  'Right': {'Left': self.reward_prob_offtarget,
-                                                            'Right': self.reward_prob_target,
-                                                            'None': 0},
-                                                  'Any': {'Left': self.reward_prob_target,
-                                                          'Right': self.reward_prob_target,
-                                                          'None': 0},
-                                                  }
         match self.target_mode:
             case 'Random':
                 self._target = random.choice(['Left', 'Right'])
@@ -217,13 +213,38 @@ class BanditTask(Task):
         self.taskblock_reset()
 
     def taskblock_reset(self):
+        if self.random_target_probs_enabled:
+            self.randomize_target_probs()
+        self._targetrewardprobabilityselection = {'Left': {'Left': self.reward_prob_target,
+                                                           'Right': self.reward_prob_offtarget,
+                                                           'None': 0},
+                                                  'Right': {'Left': self.reward_prob_offtarget,
+                                                            'Right': self.reward_prob_target,
+                                                            'None': 0},
+                                                  'Any': {'Left': self.reward_prob_target,
+                                                          'Right': self.reward_prob_target,
+                                                          'None': 0},
+                                                  }
         self.taskblocks_count = 0
         self.taskblocks_countconsecutive = 0
         self.taskblocks_currentsize = random.randint(
             *self.taskblocks_sizerange)
+        
+        self.log_notice('Switching taskblocks')
+        self.log_info(f'New target is {self._target}')
+        self.log_info(f'Target reward is {self.reward_prob_target}%')
+        self.log_info(f'Off-target reward is {self.reward_prob_offtarget}%')
+    
+    def randomize_target_probs(self):
+        if random.random() < (self.random_target_probs_probability_of_nulltrialblock/100):
+            self.log_notice('Starting null taskblock')
+            self.reward_prob_offtarget = 50
+            self.reward_prob_target = 50
+        else:
+            self.reward_prob_offtarget = random.choice(self.random_target_probs_offtargets)
+            self.reward_prob_target = random.choice(self.random_target_probs_targets)
 
     def taskblock_next(self):
-        self.taskblock_reset()
         match self._target:
             case 'Left':
                 self._target = 'Right'
@@ -231,6 +252,8 @@ class BanditTask(Task):
                 self._target = 'Left'
             case 'Any':
                 self._target = 'Any'
+        self.taskblock_reset()
+        
 
     def loop(self):
         trial_type = 'Bandit'
@@ -244,8 +267,15 @@ class BanditTask(Task):
 
         # Check if taskblock needs to be progressed
         if self.taskblocks_enabled:
-            if self.taskblocks_count >= self.taskblocks_currentsize and\
+            if self.taskblocks_count >= self.taskblocks_currentsize and \
                 self.taskblocks_countconsecutive >= self.taskblocks_minimumconsecutivecount:
+                self.log_debug((f'{self.taskblocks_count} >= '
+                                f'{self.taskblocks_currentsize} '
+                                f'{self.taskblocks_blockcounttype}s'
+                                ))
+                self.log_debug((f'{self.taskblocks_countconsecutive} >= '
+                               f'{self.taskblocks_minimumconsecutivecount} '
+                               f'consecutive {self.taskblocks_consecutivecounttype}s'))
                 self.taskblock_next()
 
         match trial_type:
@@ -282,56 +312,18 @@ class BanditTask(Task):
             if not set(['response', 'best_response', 'rewarded']).issubset(
                     trial.reports):
                 return
+            if trial.reports['response'] == 'None':
+                return
             #check if increment block counter
             if checkiftrialsatistfiescondition(self.taskblocks_blockcounttype, trial):
                 self.taskblocks_count += 1
             if checkiftrialsatistfiescondition(self.taskblocks_consecutivecounttype, trial):
                 self.taskblocks_countconsecutive += 1
             else:
-                self.taskblocks_csntconsecutive = 0
+                self.taskblocks_countconsecutive = 0
                 
         blockcountupdate(trial)
         del trial
-
-
-@dataclass
-class RandomBanditTask(BanditTask):
-    reward_prob_targets: List[int] = field(default_factory = lambda : [70,80,90,100])
-    reward_prob_offtargets: List[int] = field(default_factory = lambda: [0,10,20,30])
-    
-    taskblocks_enabled: bool = True
-    taskblocks_sizerange: tuple = (6, 15)
-    taskblocks_blockcounttype: Literal['Reward', 'Merit', 'RewardedMerit'] = 'RewardedMerit'
-    taskblocks_consecutivecounttype: Literal['Reward', 'Merit', 'RewardedMerit'] = 'Merit'
-    taskblocks_minimumconsecutivecount: int = 3
-    
-    def taskblock_reset(self):
-        super().taskblock_reset()
-        self.reward_prob_offtarget = random.choice(self.reward_prob_offtargets)
-        self.reward_prob_target = random.choice(self.reward_prob_targets)
-        self._targetrewardprobabilityselection = {'Left': {'Left': self.reward_prob_target,
-                                                           'Right': self.reward_prob_offtarget,
-                                                           'None': 0},
-                                                  'Right': {'Left': self.reward_prob_offtarget,
-                                                            'Right': self.reward_prob_target,
-                                                            'None': 0},
-                                                  'Any': {'Left': self.reward_prob_target,
-                                                          'Right': self.reward_prob_target,
-                                                          'None': 0},
-                                                  }
-
-@dataclass
-class AlternatingSideResponseTask(BanditTask):
-    slug: str = 'AltSide'
-    reward_prob_target: int = 100
-    reward_prob_offtarget: int = 0
-
-
-@dataclass
-class AnyWheelResponseTask(AlternatingSideResponseTask):
-    slug: str = 'AnyWheel'
-    target_mode: Literal['Random', 'Any', 'Left', 'Right'] = 'Any'
-    taskblocks_enabled: bool = False
 
 
 @dataclass
@@ -411,49 +403,62 @@ class ResponseAbstractStage(Stage):
 
 @dataclass
 class AnyWheelStage(ResponseAbstractStage):
-    slug: str = 'Stage1'
+    slug: str = 'AnyWheel'
 
     def define_task(self):
-        task = AnyWheelResponseTask(parent=self)
+        task = BanditTask(parent=self,
+                          target_mode='Any',
+                          reward_prob_target = 100,
+                          reward_prob_offtarget= 0,
+                          rescue_trial_enabled=True,
+                          taskblocks_enabled=False
+                          )
         task.run()
         del task
 
 @dataclass
 class AltWheelStage(ResponseAbstractStage):
-    slug: str = 'Stage2'
+    slug: str = 'AltWheel'
 
     def define_task(self):
-        task = AlternatingSideResponseTask(parent=self)
+        task = BanditTask(parent=self,
+                          reward_prob_target = 100,
+                          reward_prob_offtarget= 0,
+                          rescue_trial_enabled=True,
+                          )
         task.run()
         del task
         
 @dataclass
 class BanditTrainingStage(ResponseAbstractStage):
-    slug: str = 'Stage3'
+    slug: str = 'BanditTraining'
     _task: object = None
 
     def define_task(self):
-        task = BanditTask(parent=self)
+        task = BanditTask(parent=self,
+                          rescue_trial_enabled=True)
         task.run()
         self._task = task
 
 @dataclass
 class RandomBanditStage(ResponseAbstractStage):
-    slug: str = 'Stage3'
+    slug: str = 'RandomBandit'
     _task: object = None
 
     def define_task(self):
-        task = BanditTask(parent=self,
-                          taskblocks_sizerange = (5, 14),
-                          taskblocks_blockcounttype = 'RewardedMerit',
-                          taskblocks_minimumconsecutivecount = 3)
+        task = BanditTask(parent = self,
+                          rescue_trial_enabled = False,
+                          taskblocks_blockcounttype='RewardedMerit',
+                          taskblocks_consecutivecounttype='Merit',
+                          taskblocks_minimumconsecutivecount = 3,
+                          random_target_probs_enabled = True)
         task.run()
         self._task = task
 
 
 @dataclass
 class BanditEndStage(ResponseAbstractStage):
-    slug: str = 'Stage4'
+    slug: str = 'Bandit'
 
     def define_task(self):
         task = BanditTask(parent=self,

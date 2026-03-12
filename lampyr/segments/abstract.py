@@ -172,7 +172,7 @@ class Segment(ABC):
             print([[k, type(v)] for k, v in all_data.items()])
         self.log_debug('Storing data in session...')
         self.session.segmentlist.append(self.uniqueid)
-        self.session.segments[self.uniqueid] = (all_data)
+        self.session.segments[self.uniqueid] = all_data
         if self.rank == 0:
             self.log_notice('Detected that self is highest ranked segment')
             self.log_notice('Extracting rig data and saving to session')
@@ -191,7 +191,7 @@ class Segment(ABC):
                                            '_verbose']
         self._lampyr_inheritproperties += ['rig', 'mouse', 'session', '_output_func']
         self._dump_reducetorepresentations += ['lampyr', 'parent']
-        self._dump_exclusions += ['rig', 'session']
+        self._dump_exclusions += ['rig', 'session', 'mouse']
 
     def _inherit(self):
         if self.parent is None:
