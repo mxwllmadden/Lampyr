@@ -212,7 +212,7 @@ class MouseManager(AbstractManager):
         self.mouse = None
         if not self.exists('UNKNOWN_MOUSE'):
             self.create('UNKNOWN_MOUSE')
-        self.mouse = self.load('UNKNOWN_MOUSE')
+        self.load('UNKNOWN_MOUSE')
 
     def create(self, mouseid, **kwargs):
         mouse = Mouse(mouseid=mouseid, **kwargs)
