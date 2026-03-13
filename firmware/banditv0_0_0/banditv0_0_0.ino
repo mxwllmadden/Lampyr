@@ -28,7 +28,7 @@ long last_lick_report;
 
 void setup() {
   // put your setup code here, to run once:
-  
+  SPCR = 0;
   Serial.begin(115200);
   while (!Serial);
   pinMode(LED_BUILTIN, OUTPUT);
