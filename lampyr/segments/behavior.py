@@ -185,4 +185,4 @@ class Trial(BehaviorSegment):
         
     def _configure(self):
         super()._configure()
-        self._dump_reducetorepresentations = 'event_definitions'
+        self._dump_reducetorepresentations += ['event_definitions']
